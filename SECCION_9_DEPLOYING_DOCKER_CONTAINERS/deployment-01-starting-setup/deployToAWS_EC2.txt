@@ -1,0 +1,111 @@
+* Deploy to AWS EC2 Instance
+
+AWS EC2 is a service that allows you to spin up and manage your own remote machines.
+
+1. Create and launch EC2 instance, VPC and Security Group
+2. Configure security group to expose all required ports to WWW.
+3. Connect to instance (SSH, AWS Direct connect,etc), install docker and run container.
+
+* Bind mounts, volumes & COPY
+
+- In development
+
+#Containers should encapsulate the runtime environment but not necessarily the code.
+#Use Bind mounts to provide your local host project files to the running container.
+#Allows for instant updates withour restarting the containers.
+
+- In production
+
+#IMAGE/CONTAINER is the 'single source of truth'
+#A container should really work standalone, you should NOT have source code on your remote machine
+#Use COPY to copy a code snapshot into the image
+--> with the COPY . . command in our Dockerfile we copy our source code into the image when we build the image
+and therefore the built image has the source code and the application environment.
+#Ensures that every image runs without any extra surrounding configuration or code.
+
+* Connect to AWS EC2 Instance using Direct Connect
+
+* Installing Docker on the virtual machine Ubuntu
+
+1. Before installing Docker, you should update the package index:
+
+sudo apt-get update
+
+2. Installing docker
+
+sudo apt-get install docker.io -y
+
+3. Starting the Docker service
+
+sudo systemctl start docker
+
+4. Verifying the installation
+
+sudo docker run hello-world
+
+5. Enabling the Docker service
+
+sudo systemctl enable docker
+
+6. Check the Docker version
+
+docker --version
+
+7. Add User to Docker Group
+
+sudo usermod -a -G docker $(whoami)
+
+- After executing this command, the user will be added to the docker group and will have the necessary permissions to run Docker commands without sudo.
+- Note that the change to the user’s group membership will not take effect until the next time the user logs in. You can log out and log back in to apply the changes or use the following command to activate the changes without logging out:
+newgrp docker
+
+
+* Installing Docker on the virtual machine Linux
+sudo yum update -y
+sudo yum -y install docker
+ 
+sudo service docker start
+ 
+sudo usermod -a -G docker ec2-user
+
+- Make sure to log out + back in after running these commands.
+
+sudo systemctl enable docker
+
+- Thereafter, you can check whether Docker is available by running:
+
+docker version
+
+* Uploud the image to dockerhub
+
+1. We need a dockerhub account
+2. Create a new repository
+3. Copy the name of your repository. example: arigvidal/node-example-1
+4. Create the image locally
+docker build -t node-dep-example-1 .
+5. Push this image to dockerhub by renaming it
+docker tag node-dep-example-1 arigvidal/node-example-1
+6. Check if you are log to dockerhub in the console
+docker login 
+#If not, log with your username and password
+username
+password
+7. Push the image
+docker push arigvidal/node-example-1
+8. Run the image on your EC2 machine
+docker run -d --rm -p 80:80 arigvidal/node-example-1
+9. Check the security group inbound rules and allow http traffic
+10. Copy the public ip of the EC2 to your browser and see the app running.
+
+* Updating the image 
+
+1. Rebuild the image with the changes2. 
+2. Upload the image to dockerhub
+3. Stop the current container running our old image
+4. Download the latest image
+5. Run the container again
+
+* Disadvantages of this approach
+
+- We fully own the remote machine --> we are responsible for it and its security
+- 

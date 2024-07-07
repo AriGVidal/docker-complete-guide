@@ -1,0 +1,51 @@
+* Different ways of running commands in containers
+
+- For a node image
+docker run -it node #we can use the terminal to execute different commands
+
+docker run -it -d node #this is going to keep the container running because is waiting a command
+
+- You can used as well this command to attach yourself to the container after it was started
+docker container attach container_name
+
+- docker exec command allows you to execute certain commands inside of a running container
+1. We need the name of the container and then we can execute the command
+docker exec container_name npm init
+#this command creates a node project inside that running node container
+docker exec -it container_name npm init
+
+* Building a First utility container
+- For that I will need my image
+
+FROM node:14-alpine
+
+WORKDIR /app
+
+- I build my image
+docker build -t node-util .
+
+- I run my container in it mode
+docker run -it node-util npm init
+
+# The idea behind utility containers is that I can create something in a container without having to install
+#anything on my machine and then if I want to copy that to my machine I can do that with a bind mount
+
+docker run -it -v /home/arividal/DOCKER-COMPLETE/SECCION_7_UTILITY_CONTAINERS:/app node-util npm init
+# now I can have the package.json without having to install node in my machine
+
+* Utilizing ENTRYPOINTS
+
+FROM node:14-alpine
+
+WORKDIR /app
+
+ENTRYPOINT [ "npm" ]
+
+- Now I can run my image without the npm
+
+docker run -it -v /home/arividal/DOCKER-COMPLETE/SECCION_7_UTILITY_CONTAINERS:/app node-util init
+--> I can run my command with install for example express and is going to install express in both sides.
+
+* Using docker-compose
+
+docker-compose run --rm npm init #I need to put npm in compose command

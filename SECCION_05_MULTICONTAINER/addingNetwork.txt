@@ -1,0 +1,22 @@
+--> Adding Docker Networks for efficient Cross-Container Communication
+
+- Comando para ver todas las redes que tengo
+
+docker network ls
+
+- Comando para crear una nueva red
+
+docker network create goals-net
+
+- Ahora vuelvo a levantar todos mis contenedores sin necesidad de exponer el puerto porque van a estar todos en la misma
+- red entonces se pueden comunicar entre si.
+
+1. Para la base de datos mongo
+
+docker run --name mongodb --rm -d --network goals-net mongo
+
+2. Ahora para el backend tengo que editar el codigo para que se comunique con mi contenedor mongodb
+
+docker run --name goals-backend  --rm -d --network goals-net goals-node
+
+3. Se edita la app.js del frontend en todos los lugares donde dice localhost los cambio por el nombre de mi contenedor backend

@@ -1,0 +1,68 @@
+1. Utilizo la imagen de node, si requiere una imagen especifica la indico
+
+FROM node
+
+2. El directorio al que quiero que se copie todo dentro del contenedor
+
+WORKDIR /app
+
+3. Lo que quiero que se copie, trae todas las depedencias de la app node, el punto es para que lo copie al directorio que cree /app
+
+COPY package.json . 
+
+4. Este comando me descarga los modulos y depedencias para que la app funcione
+
+RUN npm install
+
+5. Le indico que me copie ese node_modules a la carpeta /app
+
+COPY . . 
+
+6. Le indico al contenedor que exponga el puerto 80 que es donde funciona la app
+
+EXPOSE 80
+
+7. Le indico los comandos que quiero que corra, los mismos que utilizo de manera local
+
+CMD ["node", "app.js"]
+
+- Con todos estos pasos ya podemos crear la imagen para la app en node
+- El Dockerfile especifico se encuentra en la carpeta backend
+- Con este comando creo la imagen
+* antes de contruir la imagen chequear que el codigo de mongo este especificado para docker y no este en local
+* ejemplo -> esto es local
+mongoose.connect(
+    'mongodb://localhost:27017/course-goals', 
+
+* ejemplo -> esto es para docker sin una network
+    mongoose.connect(
+        'mongodb://host.docker.internal:27017/course-goals',
+
+- Creo la imagen
+
+docker build -t goals-node .
+
+- Una vez creada la imagen corro un contenedor con la imagen
+
+docker run --name goals-backend  --rm goals-node 
+
+- Una vez creado tenemos el problema de que no se puede comunicar con el frontend, para eso tenemos que exponer el puerto 80 al correr el contenedor
+
+docker run --name goals-backend  --rm -d -p 80:80 goals-node 
+
+- Creada la network para que se comuniquen mis contenedores tengo que actualizar el codigo de la app
+- ya que ahora no estoy publicando ningun puerto
+
+* ejemplo -> esto es para docker sin una network
+    mongoose.connect(
+        'mongodb://host.docker.internal:27017/course-goals',
+
+* ejemplo -> esto es para docker con una network (debo poner el nombre de mi contenedor)
+    mongoose.connect(
+        'mongodb://mongodb:27017/course-goals',
+
+- Corro mi nuevo contenedor que se comunicara a traves de la red que cree pero sigo agregando el puerto 80 
+- para que se comunique con la parte del frontend que corre en el browser y la red que se comunica con el 
+- contenedor que tiene la base de datos mongodb
+
+docker run --name goals-backend  --rm -d -p 80:80 --network goals-net goals-node 

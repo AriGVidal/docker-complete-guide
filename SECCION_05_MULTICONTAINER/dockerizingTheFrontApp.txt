@@ -1,0 +1,56 @@
+1. La imagen depende de node asi que por eso escribimos
+- FROM node
+
+2. Creo un directorio
+- WORKDIR /app
+
+3. Como tenemos dependencias aqui tenemos que copiar el json al working directory
+- COPY package.json .
+
+4. Y despues correr un comando para instalar npm
+- RUN npm install
+
+5. Quiero copiar el codigo que queda a mi directorio
+- COPY . .
+
+6. Expongo el puerto 3000
+- EXPOSE 3000
+
+7. Quiero especificar un comando que sera ejecutado cada vez que se inicie el contenedor basado en esta imagen
+- CMD ["npm", "start"]
+
+8. Creamos la imagen
+docker build -t goals-react .
+
+9. Ahora corremos un contenedor
+docker run --name goals-frontend --rm -d -p 3000:3000 goals-react --> no funciona porque hay que agregarle el interactive mode
+
+docker run --name goals-frontend --rm -p 3000:3000 -it goals-react
+
+10. Una vez creada la network que comunicara mis contenedores tengo que editar mi codigo en todos los lugares que diga localhost y poner el nombre del contenedor backend con el que se comunicara
+
+--> sin red 'http://localhost/goals/'
+
+--> con network 'http://goals-backend/goals/'
+
+11. Creo nuevamente mi imagen
+
+docker build -t goals-react .
+
+12. Corro nuevamente el contenedor agregandole la network, dejo los puertos para poder interactuar con la app en mi browser
+
+docker run --name goals-frontend --network goals-net --rm -p 3000:3000 -it goals-react
+
+13. Obtenemos un error de tipo SOMETHING WENT WRONG - failed to fetch
+- Esto sucede porque react esta hecho para generar el codigo en el browser y nuestro contenedor solo arranca la app, no la sigue ejecutando
+- por lo tanto necesito volver los endpoints al estado original de localhost y publicar el puerto 80 de la app backend
+- En la app react el codigo no corre en el contenedor sino que corre en el navegador o browser.
+
+14. Vuelvo al localhost en el codigo
+'http://localhost/goals/'
+
+15. Creo la imagen nuevamente
+docker build -t goals-react .
+
+16. Corro el contenedor como lo hice la primera vez
+docker run --name goals-frontend --rm -p 3000:3000 -it goals-react

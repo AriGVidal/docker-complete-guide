@@ -1,0 +1,462 @@
+LARAVEL PROJECT 2024 version
+
+* Project structure
+
+laravel-project
+|-dockerfiles
+  -composer.dockerfile
+  -nginx.dockerfile
+  -php.dockerfile
+|-env
+  -mysql.env
+|-nginx
+  -nginx.conf
+|-src
+|docker-compose.yml
+
+* Final docker-compose.yml
+
+services:
+  server:
+    # image: 'nginx:stable-alpine'
+    build:
+      context: .
+      dockerfile: dockerfiles/nginx.dockerfile
+    ports:
+      - '8000:80'
+    volumes:
+      - ./src:/var/www/html
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+      - mysql
+  php:
+    build:
+      context: .
+      dockerfile: dockerfiles/php.dockerfile
+    volumes:
+      - ./src:/var/www/html:delegated
+  mysql:
+    image: mysql:5.7
+    env_file:
+      - ./env/mysql.env
+  composer:
+    build:
+      context: ./dockerfiles
+      dockerfile: composer.dockerfile
+    volumes:
+      - ./src:/var/www/html
+  artisan:
+    build:
+      context: .
+      dockerfile: dockerfiles/php.dockerfile
+    volumes:
+      - ./src:/var/www/html
+    entrypoint: [ 'php', '/var/www/html/artisan' ]
+  npm:
+    image: node:14
+    working_dir: /var/www/html
+    entrypoint: [ 'npm' ]
+    volumes:
+      - ./src:/var/www/html
+
+* composer.dockerfile
+FROM composer:latest
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+
+USER laravel 
+
+WORKDIR /var/www/html
+ 
+ENTRYPOINT [ "composer", "--ignore-platform-reqs" ]
+
+* nginx.dockerfile
+FROM nginx:stable-alpine
+ 
+WORKDIR /etc/nginx/conf.d
+ 
+COPY nginx/nginx.conf .
+ 
+RUN mv nginx.conf default.conf
+
+WORKDIR /var/www/html
+ 
+COPY src .
+
+* php.dockerfile
+FROM php:8.3-fpm-alpine
+
+WORKDIR /var/www/html
+
+COPY src .
+
+RUN docker-php-ext-install pdo pdo_mysql
+
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+
+RUN chown -R laravel:laravel /var/www/html
+
+USER laravel 
+
+* nginx.conf
+server {
+  listen 80;
+  index index.php index.html;
+  server_name localhost;
+  root /var/www/html/public;
+  location / {
+      try_files $uri $uri/ /index.php?$query_string;
+  }
+  location ~ \.php$ {
+      try_files $uri =404;
+      fastcgi_split_path_info ^(.+\.php)(/.+)$;
+      fastcgi_pass php:9000;
+      fastcgi_index index.php;
+      include fastcgi_params;
+      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+      fastcgi_param PATH_INFO $fastcgi_path_info;
+  }
+}
+
+
+- STEPS
+
+1. run 
+docker-compose run --rm composer create-project --prefer-dist laravel/laravel .
+#importan--> if you need to run the create-project again make sure to delete the src folder and create another one with the same name (src)
+2. In the laravel project in the src folder open the .env file and change the database information for this one and save the file.
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=homestead
+DB_USERNAME=homestead
+DB_PASSWORD=secret
+# ADD THIS ONE -- !IMPORTANT
+DB_COLLATION=utf8mb4_unicode_ci
+
+3. run
+docker-compose up -d server
+4. run #make sure artisan is in the src folder and not in a laravel folder
+docker-compose run artisan migrate
+5. run 
+docker-compose run artisan view:cache
+6. Open localhost:8000
+
+---Down here are all the problems that me and other people have and how to fix them.
+
+Laravel Project -- IF YOU HAVE ISSUES -OLDER VERSIONS
+
+1. Grab Max's snapshot from the end of the section, and use the code found in laravel-04-fixed.zip
+
+2. Open the dockerfiles/php.dockerfile, and change the FROM instruction to FROM php:8.1-fpm-alpine , save and close the file
+
+3. To avoid file permissions issue if you have an "src" folder still in your root project folder, delete it and recreate it (so it is an empty folder)
+
+4. Time to create our Laravel project, run docker-compose run --rm composer create-project --prefer-dist laravel/laravel:^8.0 . , in your root project's folder
+
+5. Open src/.env in your editor and change the configuration lines for the database connection as follows
+
+DB_DATABASE=homestead
+DB_USERNAME=homestead
+DB_PASSWORD=secret
+6. Run the project, docker-compose up mysql server php and access it on http://localhost:8000
+
+---
+
+composer.dockerfile
+
+FROM composer:latest
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+USER laravel 
+ 
+WORKDIR /var/www/html
+ 
+ENTRYPOINT [ "composer", "--ignore-platform-reqs" ]
+nginx.dockerfile
+
+FROM nginx:stable-alpine
+ 
+WORKDIR /etc/nginx/conf.d
+ 
+COPY nginx/nginx.conf .
+ 
+RUN mv nginx.conf default.conf
+ 
+WORKDIR /var/www/html
+ 
+COPY src .
+php.dockerfile
+
+FROM php:8.1-fpm-alpine
+ 
+WORKDIR /var/www/html
+ 
+COPY src .
+ 
+RUN docker-php-ext-install pdo pdo_mysql
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+USER laravel
+docker-compose.yml
+
+version: '3.8'
+ 
+services:
+    server:
+        # image: 'nginx:stable-alpine'
+        build:
+            context: .
+            dockerfile: dockerfiles/nginx.dockerfile
+        ports:
+            - '8000:80'
+        volumes:
+            - ./src:/var/www/html
+            - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+        depends_on:
+            - php
+            - mysql
+    php:
+        build:
+            context: .
+            dockerfile: dockerfiles/php.dockerfile
+        volumes:
+            - ./src:/var/www/html:delegated
+    mysql:
+        image: mysql:5.7
+        env_file:
+            - ./env/mysql.env
+    composer:
+        build:
+            context: .
+            dockerfile: dockerfiles/composer.dockerfile
+        volumes:
+            - ./src:/var/www/html
+    artisan:
+        build:
+            context: .
+            dockerfile: dockerfiles/php.dockerfile
+        volumes:
+            - ./src:/var/www/html
+        entrypoint: ['php', '/var/www/html/artisan']
+    npm:
+        image: node:14
+        working_dir: /var/www/html
+        entrypoint: ['npm']
+        volumes:
+            - ./src:/var/www/html
+===========================================
+
+FOR LARAVEL 11 ONLY -- additional steps required
+
+php.dockerfile (php 8.2+ required)
+
+FROM php:8.3-fpm-alpine
+ 
+WORKDIR /var/www/html
+ 
+COPY src .
+ 
+RUN docker-php-ext-install pdo pdo_mysql
+composer.dockerfile
+
+FROM composer:latest
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+USER laravel 
+ 
+WORKDIR /var/www/html
+ 
+#unsure if this is needed
+USER root 
+ 
+ENTRYPOINT [ "composer", "--ignore-platform-reqs" ]
+(rebuild those containers)
+
+# Build your project (delete any existing "src" directory)
+
+docker compose run composer create-project --prefer-dist laravel/laravel
+
+# Start your project
+
+docker compose up -d server php mysql
+
+# Edit your environment variables
+
+src/.env
+
+# New field -- represents the database type
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=homestead
+DB_USERNAME=homestead
+DB_PASSWORD=secret
+# ADD THIS ONE -- !IMPORTANT
+DB_COLLATION=utf8mb4_unicode_ci
+Save the file.
+
+# You must run the Artisan migration FIRST
+
+-- the default configuration now uses flatstorage (sqlite), and now we need to migrate the data to our SQL database
+
+docker compose run artisan migrate
+
+one more command to update the view's cache
+
+docker compose run artisan view:cache
+
+# You should now be able to view your project at http://localhost:8000
+
+* Another issue with src file
+Had a different issue working on Docker for Windows, I was getting a 404 from nginx host.
+composer was creating the project inside a "laravel" folder so I switched the copy commands and volumes from scr to "scr/laravel"
+
+COPY src/laravel .
+ 
+ 
+volumes:
+      - ./src/laravel:/var/www/html
+
+* Issue with permissions
+
+Hello,
+
+For those still getting a "Permissions denied" error, one thing I did and it worked was just changing the following command:
+
+RUN chown -R www-data:www-data /var/www/html
+
+by:
+
+RUN chown -R laravel:laravel /var/www/html
+
+and placing it after the instruction where you create your laravel user.
+
+
+
+The entire PHP dockerfile finally looks like this:
+
+
+
+FROM php:8.1-fpm-alpine
+ 
+WORKDIR /var/www/html
+ 
+COPY src .
+ 
+RUN docker-php-ext-install pdo pdo_mysql
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+RUN chown -R laravel:laravel /var/www/html
+ 
+USER laravel
+
+
+I am not an expert in Linux, but I think that running chown with www-data user, and then changing user to laravel with the USER line, 
+makes the container not capable of writing files anymore in /var/www/html, since they belong to www-data and user laravel tries to 
+write into it (but I may be wrong!).
+
+
+-------------------------------------------------------------------------------
+For this Laravel project we are going to have 6 services in our docker-compose
+
+1. server: the nginx server, which will take all the incoming requests and trigger the php interpreter.
+The server in this application should have a look at incoming requests and eventually funnel them to our php container
+and let that container execute our php code. So we add a bind mount and I wanna bind a local folder, an nginx folder
+and an nginx conf file and in the container I want to bind it to an absolute path in the etc folder
+volumes: 
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro 
+      #ro=readonly because this configuration should never change
+2. php: the php container which is responsible for running and executing our php code
+We are going to create a custom image por our php container
+
+FROM php:7.4-fpm-alpine
+
+WORKDIR /var/www/html #our web app should be here
+
+RUN docker-php-ext-install pdo pdo_mysql
+
+- This php container does not need ports open in my locale machine because is going to communicate directly
+- to the nginx server not through our local host
+
+3. mysql: the container taht holds the mysql database
+We use the mysql image in docker hub, create apart a env folder with an mysql.env file to save all the variables.
+mysql:
+image: mysql:5.7
+env_file:
+  - ./env/mysql.env
+#utility containers
+4. composer:
+We generated a dockerfile for the composer and used the composer base image already in dockerhub.
+I want to specify an entrypoint, the 'composer' execute which exits in composer and
+"--ignore-platform-reqs" this command ensures that we can run this without any warnings or errors
+even if some dependecies would be missing
+build:
+  context: ./dockerfiles
+  dockerfile: php.dockerfile
+- After that we add the volumes because we need to ensure that we expose our source code directory to that image.
+  volumes:
+    - ./src:/var/www/html
+
+* Creating a Laravel app via the composer utility container
+With the docker compose we can run single container as well
+  docker-compose run --rm composer create-project --prefer-dist laravel/laravel .
+  # el . es para que se cree en el folder que especificamos en el compose y gracias al bind mount lo vere reflejado
+  # in my source folder
+
+  - Fixing Errors With The Next Lecture
+When using Docker on Linux, you might face permission errors when adding a bind mount as shown in the next lecture.
+If you do, try these steps:
+Change the php.dockerfile so that it looks like that:
+
+FROM php:8.2.4-fpm-alpine
+ 
+WORKDIR /var/www/html
+ 
+COPY src .
+ 
+RUN docker-php-ext-install pdo pdo_mysql
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+USER laravel
+
+* Please note that the RUN chown instruction was removed here, instead we now create a user "laravel" which we use 
+(with the USER instruction) for commands executed inside of this image / container).
+
+Also edit the composer.dockerfile to look like this:
+
+FROM composer:2.5.7
+ 
+RUN addgroup -g 1000 laravel && adduser -G laravel -g laravel -s /bin/sh -D laravel
+ 
+USER laravel
+ 
+WORKDIR /var/www/html
+ 
+ENTRYPOINT [ "composer", "--ignore-platform-reqs" ]
+
+Here, we add that same "laravel" user and use it for creating the project therefore.
+
+These steps should ensure that all files which are created by the Composer container are assigned to a user
+named "laravel" which exists in all containers which have to work on the files.
+
+- Once created the laravel project we should change in the .env file the data from database with our own configuration
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=homestead
+DB_USERNAME=homestead
+DB_PASSWORD=secret
+
+- In the docker-compose file we need to add another volume to the server service because the incoming
+- requests hit the server first and it only forwards request to php files to the php interpreter, that
+- means that these php files need to be expose to the server and thats why we need the bind mount where I bind my 
+- source foulder to the /var/www/html folder inside the container
+5. artisan:
+6. npm:

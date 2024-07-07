@@ -1,0 +1,131 @@
+* Adding Data Peristence to MongoDB with Volumes
+
+We should make sure that the data persist and the access to the database is limited.
+
+- For the data to persist we add a volume with the -v command, then we need to know the path that the mongodb container
+- uses internally for storing that database data. Como la imagen mongo no es nuestra no sabemos que path usa internamente
+- pero lo podemos ver en la documentacion
+
+docker run --name mongodb -v data:/data/db --rm -d --network goals-net mongo
+
+- Este comando genera un named volume al cual llamamos data el cual crea docker pero nosotros no sabes el path
+- La diferencia con el bind mount es que en ese tenemos el full path, en el named volume solo le ponemos un nombre al volumen
+- y lo unimos al que genera el contenedor, en este caso data/db
+
+* Adding Security to our database
+- Para agregarle seguridad a la base y que me pida usuario y contrasenia para acceder a ella agrego 2 variables de entorno
+
+MONGO_INITDB_ROOT_USERNAME=arividal
+MONGO_INITDB_ROOT_PASSWORD=secret
+
+- Corro nuevamente mi container agregando estas dos variables de entorno con el flag -e
+
+docker run --name mongodb -v data:/data/db --rm -d --network goals-net -e MONGO_INITDB_ROOT_USERNAME=arividal -e MONGO_INITDB_ROOT_PASSWORD=secret mongo
+
+- Una vez generadas estas variables tenemos que editar nuestra conexion a mongo en el backend y poner nuestro 
+- usuario y contrasenia junto con el auth
+# sin usuario ni pw
+mongoose.connect(
+    'mongodb://mongodb:27017/course-goals',
+
+#con usuario y pw
+mongoose.connect(
+    'mongodb://arividal:secret89@mongodb:27017/course-goals?authSource=admin',
+
+* Adding Data Persistence to our Node app
+
+- Se puede utilizar bind mounts o volumes
+# Utilizando bindmount and volumes
+- In this app we need 1 bind mount and 1 volume, the bind mount to bind everything in my app folder to my local hosting
+- directory to ensure that whenever I change something in my source code is reflected in the container and the other volume
+- for the logs 
+         -v logs:/app/logs
+
+/app is our working directory specified in the Dockerfile
+/logs we have the logs folder in wich our app writes the logs files
+
+- For the bind mount we need the full path to our folder (the folder with the app.js)
+
+         -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/backend:/app
+
+- Agregamos un 3er volumen, puede ser anonimo, para que cada vez que se actualice mi codigo no me sobreescriba la carpeta node_modules y perder depedencias
+
+        -v /app/node_modules
+
+- Vuelvo a correr el contenedor con todos mis volumenes
+
+docker run --name goals-backend -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/backend:/app -v logs:/app/logs -v /app/node_modules --rm -p 80:80 --network goals-net goals-node
+
+---> Eliminamos el package-lock.json y en el package.json agregamos una dependencia para que cada vez que nuestro codigo cambie se reinicie con las nuevas modificaciones
+- Agrego la dependencia nodemon que va monitoreando los cambios en nuestro codigo js y si este ha cambiado lo que hace es 
+- re start the node server
+
+"devDependencies": {
+    "nodemon": "3.1.4"
+  }
+
+- Y en scripts agrego un start para nodemon
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js"
+  },
+
+- Y en el Dockerfile cambio
+--> CMD ["node", "app.js"]
+- Por esto
+--> CMD ["npm", "start"]
+
+- Creo nuevamente mi imagen
+
+docker build -t goals-node .
+
+- Genero mi contenedor con los nuevos cambios
+
+docker run --name goals-backend -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/backend:/app -v logs:/app/logs -v /app/node_modules --rm -p 80:80 --network goals-net goals-node
+
+- Esto me genera un error de autentificacion
+codeName: 'AuthenticationFailed'
+
+- Vamos a correr la base mongo sin las credenciales ya que estas son a modo educativo, en un ambiente de produccion no 
+- se utilizan de esta manera y la base de datos tampoco.
+
+# Lo que hacemos es crear en el Dockerfile dos variables de entorno y en el codigo cambiamos la base para que se puedan 
+# ingresar valores de manera dinamica
+
+* Dockerfile
+
+ENV MONGODB_USERNAME=root 
+ENV MONGODB_PASSWORD=secret 
+
+* En el codigo
+
+mongoose.connect(
+  `mongodb://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@mongodb:27017/course-goals?authSource=admin`,
+
+- Creo nuevamente mi imagen
+
+docker build -t goals-node .
+
+- Genero el contenedor
+
+docker run --name goals-backend -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/backend:/app -v logs:/app/logs -v /app/node_modules -e MONGODB_USERNAME=ari --rm -p 80:80 --network goals-net goals-node
+ codeName: 'AuthenticationFailed'
+
+- Las variables de entorno en el codigo me generan error
+
+* Adding Data Persistence to the Frontend app with Volumes
+
+- Quiero generar mi contenedor de manera que los cambios en mi codigo fuente se vean reflejados en el contenedor
+- Generamos un bind mount
+  -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/frontend/src:/app/src
+
+  app es mi directorio dentro del contenedor
+  src es donde tengo todo mi codigo fuente
+
+- En este proyecto no necesitamos ninguna depedencia porque ya esta configurado para detectar cambios y hacer reload 
+- cada vez que algun cambio en mi codigo se produzca.
+
+- Corro el contenedor agregando el bind mount
+docker run -v /home/arividal/DOCKER-COMPLETE/SECCION_05/multi-01-starting-setup/frontend/src:/app/src --name goals-frontend --rm -p 3000:3000 -it goals-react
+
+#Funciona perfectoen la app react

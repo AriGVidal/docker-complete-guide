@@ -1,0 +1,139 @@
+* What Docker Compose is...
+
+Docker compose is a tool that allows you to replace 'docker builds' and 'docker run' commands
+with just one configuration file and a series of orchestrations commands (build, start, stop) to 
+start all those services, all these containers at once and build all necessary images.
+And then you can use one command to stop everything and bring everything down.
+
+* What Docker Compose is NOT...
+
+- Docker Compose does NOT replace Dockerfiles for custom images (works together with Dockerfiles)
+- Docker Compose does NOT replace Images or Containers
+- Docker Compose is NOT suited for managing multiple containers on different hosts (machines)
+
+* Writing Docker Compose files
+
+1. Most important SERVICES (containers)
+2. docker-compose.yaml file
+
+* Creating a Compose file
+
+version: is not needed anymore, but we can used it for a follow up of the version of our app (v1, v2, v3, etc)
+services: I put here all my container with a label name that I choose (mydatabase, backend, frontend, etc)
+- Inside this services we put all aspects or commands that we want to use for every service
+ (name of the image, volumes, variables, etc)
+#image
+image: 'mongo'
+- Especificamos la imagen en '' o ""
+Esta imagen puede ser un nombre de imagen el cual docker buscara localmente o en dockerhub, puede ser una URL completa
+que apunte a un repositorio
+#-d and --rm
+In docker compose we don't need to specify this commands because by default when you bring your services down they will
+be remove and for the detached mode we can specify that when we launch the file.
+#volumes
+- For the volumes we need to specify them in the file
+volumes:
+  - data:/data/db
+- For volumes we should specify again the name of the volume at the service level in our file
+volumes:
+  data:
+#environment variables
+- For the environment variables we can create a file inside a folder call env and put our variables there or we can
+- put the variables in the compose file
+environment:
+  MONGO_INITDB_ROOT_USERNAME: ari
+  - MONGO_INITDB_ROOT_USERNAME= ari
+--> se pueden escribir las variables de estas dos formas.
+#network
+- You can add a network in the file and specify all the networks but in many cases is not needed.
+network:
+  - goals-net
+- The reason why you don't need to create a network is because when we use compose docker will automatically
+- create a new environment for all the services specify in the docker compose file and it will add
+- all the services to that network
+
+* Starting the docker compose
+
+docker-compose up
+
+- We can start in detached mode as well
+
+docker-compose up -d
+
+- To stop the compose
+
+docker-compose down
+
+- This command delete the compose and all the environment that created except for the volumes. If we want to remove volumes
+docker-compose down -v
+
+* Backend service
+- Compose can built our image from the Dockerfile
+backend:
+  build: ./backend --> we need to specify were is the Dockerfile
+
+- Another way
+backend:
+build:
+  context: ./backend #the path to your Dockerfile
+  dockerfile: Dockerfile #if your Dockerfile is named different
+
+- Ports
+It allows you to specify publish ports. You specify them as a list
+ports:
+  - '80:80'
+  - '3000:80'
+  - you can specify multiple ports as well
+
+- Volumes
+In docker compose we can use relatives path for bind mount
+volumes:
+      - logs:/app/logs
+      - ./backend:/app
+      - /app/node_modules
+    env_file:
+      - ./env/backend
+
+- Docker compose have another feature call
+ * depends_on #in this case we need the mongodb up before the backend service
+
+env_file:
+  - ./env/backend
+depends_on:
+  - mongodb
+
+* Frontend service
+
+- Is exactly the same as for the backend and mongo, the only thing that we should adjust is the it mode
+
+frontend:
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+  ports:
+    - '3000:3000'
+  volumes:
+    - ./frontend/src:/app/src
+#interactive mode
+  stdin_open: true    #this let docker know that this service needs an open input connection
+  tty: true #tty is for attaching the terminal
+
+* Docker compose commands
+
+docker-compose up
+docker-compose up -d #for detached mode
+docker-compose down 
+docker-compose up --help
+docker-compose up --build #if you change something rebuilds the images before starting the containers
+docker-compose build #if you want to build the images withour trigger the containers
+
+- Docker container name
+In general docker compose pick the name of the project folder and attach the service name but if we wanr to name the container we can
+services:
+  mongodb:
+    image: 'mongo'
+    volumes:
+      - data:/data/db
+    env_file:
+      - ./env/mongo.env
+    container_name: mongodb  <-- we assigned a name to the container
